@@ -334,14 +334,18 @@ class EPUBBookLoader(BaseBookLoader):
                 p.append(copy(content))
         else:
             # Bilingual mode: keep original paragraph with code, add translation after
+            orig_style = "background-color: rgba(120, 120, 160, 0.15); border-left: 4px solid #7c5cff; padding: 10px 14px; margin-top: 14px; margin-bottom: 6px; border-radius: 0 8px 8px 0; font-style: italic;"
+            existing_orig = p.attrs.get("style", "") if hasattr(p, "attrs") and p.attrs else ""
+            p["style"] = f"{orig_style} {existing_orig}".strip()
+
             new_p = copy(p)
             # Remove code tags from translation
             for tag_name in exclude_tags_list:
                 for tag in new_p.find_all(tag_name):
                     tag.extract()
             new_p.string = translated_text
-            if translation_style != "":
-                new_p["style"] = translation_style
+            trans_style = translation_style if translation_style != "" else "padding: 4px 14px 14px 4px; margin-top: 0; margin-bottom: 20px;"
+            new_p["style"] = trans_style
             p.insert_after(new_p)
 
     def _process_paragraph(self, p, new_p, index, p_to_save_len, thread_safe=False):
@@ -810,6 +814,8 @@ class EPUBBookLoader(BaseBookLoader):
                 if self.sentence_mode:
                     if self._process_paragraph_sentence_mode(p, soup):
                         index += 1
+                        if not sys.stderr.isatty():
+                            print(f"Progress: {index}/{pbar.total} ({index/pbar.total*100:.1f}%)")
                         pbar.update(1)
                         print()
                         if self.is_test and index >= self.test_num:
@@ -825,6 +831,8 @@ class EPUBBookLoader(BaseBookLoader):
                         index, n = self._process_combined_paragraph(
                             p_block, index, p_to_save_len, thread_safe=False
                         )
+                        if not sys.stderr.isatty():
+                            print(f"Progress: {index}/{pbar.total} ({index/pbar.total*100:.1f}%)")
                         pbar.update(n)
                         p_block = []
                         print()
@@ -832,6 +840,8 @@ class EPUBBookLoader(BaseBookLoader):
                     index = self._process_paragraph(
                         p, new_p, index, p_to_save_len, thread_safe=False
                     )
+                    if not sys.stderr.isatty():
+                        print(f"Progress: {index}/{pbar.total} ({index/pbar.total*100:.1f}%)")
                     print()
                     pbar.update(1)
 
@@ -844,6 +854,8 @@ class EPUBBookLoader(BaseBookLoader):
                 index, n = self._process_combined_paragraph(
                     p_block, index, p_to_save_len, thread_safe=False
                 )
+                if not sys.stderr.isatty():
+                    print(f"Progress: {index}/{pbar.total} ({index/pbar.total*100:.1f}%)")
                 pbar.update(n)
 
         if soup:
@@ -1177,6 +1189,7 @@ class EPUBBookLoader(BaseBookLoader):
         pbar = tqdm(
             total=self.test_num if self.is_test else all_p_length,
             leave=not self.is_test,
+            disable=not sys.stderr.isatty(),
         )
         print()
         index = 0
@@ -1222,7 +1235,10 @@ class EPUBBookLoader(BaseBookLoader):
                 # Create a simpler progress bar for parallel processing
                 pbar.close()  # Close the original progress bar
                 chapter_pbar = tqdm(
-                    total=len(document_items), desc="Chapters", unit="ch"
+                    total=len(document_items),
+                    desc="Chapters",
+                    unit="ch",
+                    disable=not sys.stderr.isatty(),
                 )
 
                 chapter_data_list = [
@@ -1332,8 +1348,11 @@ class EPUBBookLoader(BaseBookLoader):
 
     def load_state(self):
         try:
-            with open(self.bin_path, "rb") as f:
-                self.p_to_save = pickle.load(f)
+            if os.path.exists(self.bin_path):
+                with open(self.bin_path, "rb") as f:
+                    self.p_to_save = pickle.load(f)
+            else:
+                self.p_to_save = []
         except Exception:
             raise Exception("can not load resume file")
 

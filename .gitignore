@@ -145,3 +145,15 @@ log/
 books/
 prompts/
 .pdm-python
+
+# API Keys & Local Scripts
+*_keys.json
+bbm_keys.json
+gemini_keys.json
+create_gcp_keys.sh
+run_*.py
+batch_overnight_translate.py
+Technical-books/
+chapter1_*.md
+*.bin.bak
+.temp.bin*

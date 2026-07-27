@@ -77,11 +77,14 @@ bbook --book_name test_books/animal_farm.epub --openai_key ${openai_key} --test
 
 * Gemini
 
-  Support Google [Gemini](https://aistudio.google.com/app/apikey) model, use `--model gemini` for Gemini Flash or `--model geminipro` for Gemini Pro.
-  If you want to use a specific model alias with Gemini (eg `gemini-2.5-flash` or `gemini-2.0-flash`), you can use `--model gemini --model_list gemini-2.5-flash,gemini-2.0-flash`. `--model_list` takes a comma-separated list of model aliases.
+  Support Google [Gemini](https://aistudio.google.com/app/apikey) models (e.g., `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.1-flash-lite`). Use `--model gemini` with optional `--model_list gemini-3.6-flash,gemini-3.5-flash`.
+
+  **Multi-Project Key Pool & Key Rotation**:
+  To overcome API rate limits (`429 RESOURCE_EXHAUSTED` or `503 UNAVAILABLE`), you can supply multiple API keys across multiple GCP projects. Keys can be passed as a comma-separated string, or stored as a **JSON Array** (`["key1", "key2", ...]`) or **JSON Object** in `~/.bbm/keys.json`, `./bbm_keys.json`, or `~/.config/bilingual_book_maker/gemini_key`.
+  When a key exhausts its quota, the engine automatically rotates to the next key and resets to the primary model (`gemini-3.6-flash`).
 
   ```shell
-  python3 make_book.py --book_name test_books/animal_farm.epub --model gemini --gemini_key ${gemini_key}
+  python3 make_book.py --book_name test_books/animal_farm.epub --model gemini --gemini_key ${gemini_key} --model_list gemini-3.6-flash,gemini-3.5-flash
   ```
 
 * Qwen
@@ -174,8 +177,31 @@ bbook --book_name test_books/animal_farm.epub --openai_key ${openai_key} --test
 
 ## Use
 
-- Once the translation is complete, a bilingual book named `${book_name}_bilingual.epub` would be generated for EPUB inputs; for TXT/MD/SRT inputs a bilingual text (or subtitle) file named `${book_name}_bilingual.txt` (or `_bilingual.srt`) will be generated. For **PDF inputs** the tool will produce a bilingual `.txt` fallback and will also attempt to create `${book_name}_bilingual.epub` — if EPUB creation fails, the TXT fallback remains so you do not need to retranslate.
+- Once the translation is complete, a bilingual book named `${book_name}_bilingual.epub` would be generated for EPUB inputs; for TXT/MD/SRT inputs a bilingual text (or subtitle) file named `${book_name}_bilingual.txt` (or `_bilingual.srt`) will be generated.
 - If there are any errors or you wish to interrupt the translation by pressing `CTRL+C`, a temporary bilingual file (for example `{book_name}_bilingual_temp.epub` or `{book_name}_bilingual_temp.txt`) would be generated. You can simply rename it to any desired name.
+
+## Features & Flow
+
+### 📄 PDF to Bilingual EPUB Conversion Flow
+You can pass any `.pdf` book directly to `make_book.py`. The tool extracts the document structure, preserves layout elements, handles paragraph merging, and compiles the translated text directly into a beautifully formatted `${book_name}_bilingual.epub` file.
+
+```shell
+python3 make_book.py --book_name my_book.pdf --model gemini --gemini_key ${gemini_key}
+```
+
+### 🎨 Automatic RGBA Callout Box Styling
+In Bilingual EPUB mode, original English blocks are automatically wrapped in a modern callout box (`background-color: rgba(120, 120, 160, 0.15); border-left: 4px solid #7c5cff; padding: 10px 14px; font-style: italic;`) while the translated blocks are padded cleanly below. This ensures 100% visual distinction across Apple Books, Kindle, and e-readers in both Light and Dark modes.
+
+### 🎭 Genre-Specific System Prompts
+Customize translation tone by setting environment variables (`BBM_GEMINIAPI_SYS_MSG` or `BBM_CHATGPTAPI_SYS_MSG`):
+- **Technical Books**: Preserves technical terms with English in parentheses (e.g. `sao chép dữ liệu (replication)`).
+- **Memoirs & Autobiographies**: First-person narration (`Tôi`), solemn 19th-century tone, historical terminology (`chủ nô`, `kẻ cai nô`), without parenthetical English terms.
+
+### 📖 Monolingual Target Language EPUB (`--single_translate`)
+To produce a pure target-language book (e.g. Full Vietnamese) without the original source text:
+```shell
+python3 make_book.py --book_name my_book.epub --model gemini --language Vietnamese --single_translate
+```
 
 ## Params
 

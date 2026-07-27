@@ -210,7 +210,7 @@ class PDFBookLoader(BaseBookLoader):
             doc = fitz.open(self.pdf_name)
             lines = []
             total_pages = len(doc)
-            with tqdm(total=total_pages, desc="Extracting text", unit="pg") as pbar:
+            with tqdm(total=total_pages, desc="Extracting text", unit="pg", disable=not sys.stderr.isatty()) as pbar:
                 for page in doc:
                     text = page.get_text("text")
                     if text:
@@ -346,7 +346,7 @@ class PDFBookLoader(BaseBookLoader):
                 self.origin_book[i : i + self.batch_size]
                 for i in range(0, len(self.origin_book), self.batch_size)
             ]
-            with tqdm(total=len(sliced_list), desc="Translating", unit="b") as pbar:
+            with tqdm(total=len(sliced_list), desc="Translating", unit="b", disable=not sys.stderr.isatty()) as pbar:
                 for i in sliced_list:
                     # fix the format thanks https://github.com/tudoujunha
                     batch_text = "\n".join(i)

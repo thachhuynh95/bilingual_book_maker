@@ -10,6 +10,7 @@ from book_maker.loader import BOOK_LOADER_DICT
 from book_maker.translator import MODEL_DICT
 from book_maker.provider_loader import get_provider, get_translator_class
 from book_maker.utils import LANGUAGES, TO_LANGUAGE_CODE
+from book_maker import key_loader
 
 
 def get_book_type(book_name):
@@ -494,6 +495,7 @@ So you are close to reaching the limit. You have to choose your own value, there
     ]:
         if OPENAI_API_KEY := (
             options.openai_key
+            or key_loader.get_key("openai_key")
             or env.get(
                 "OPENAI_API_KEY",
             )  # XXX: for backward compatibility, deprecate soon
@@ -511,32 +513,37 @@ So you are close to reaching the limit. You have to choose your own value, there
                 "OpenAI API key not provided, please google how to obtain it",
             )
     elif options.model == "caiyun":
-        API_KEY = options.caiyun_key or env.get("BBM_CAIYUN_API_KEY")
+        API_KEY = options.caiyun_key or key_loader.get_key("caiyun_key") or env.get("BBM_CAIYUN_API_KEY")
         if not API_KEY:
             raise Exception("Please provide caiyun key")
     elif options.model == "deepl":
-        API_KEY = options.deepl_key or env.get("BBM_DEEPL_API_KEY")
+        API_KEY = options.deepl_key or key_loader.get_key("deepl_key") or env.get("BBM_DEEPL_API_KEY")
         if not API_KEY:
             raise Exception("Please provide deepl key")
     elif options.model and options.model.startswith("claude"):
-        API_KEY = options.claude_key or env.get("BBM_CLAUDE_API_KEY")
+        API_KEY = options.claude_key or key_loader.get_key("claude_key") or env.get("BBM_CLAUDE_API_KEY")
         if not API_KEY:
             raise Exception("Please provide claude key")
     elif options.model == "customapi":
-        API_KEY = options.custom_api or env.get("BBM_CUSTOM_API")
+        API_KEY = options.custom_api or key_loader.get_key("custom_api") or env.get("BBM_CUSTOM_API")
         if not API_KEY:
             raise Exception("Please provide custom translate api")
     elif options.model in ["gemini", "geminipro"]:
-        API_KEY = options.gemini_key or env.get("BBM_GOOGLE_GEMINI_KEY")
+        API_KEY = options.gemini_key or key_loader.get_key("gemini_key") or env.get("BBM_GOOGLE_GEMINI_KEY")
     elif options.model == "groq":
-        API_KEY = options.groq_key or env.get("BBM_GROQ_API_KEY")
+        API_KEY = options.groq_key or key_loader.get_key("groq_key") or env.get("BBM_GROQ_API_KEY")
     elif options.model == "xai":
-        API_KEY = options.xai_key or env.get("BBM_XAI_API_KEY")
+        API_KEY = options.xai_key or key_loader.get_key("xai_key") or env.get("BBM_XAI_API_KEY")
     elif options.model and options.model.startswith("qwen-"):
-        API_KEY = options.qwen_key or env.get("BBM_QWEN_API_KEY")
+        API_KEY = options.qwen_key or key_loader.get_key("qwen_key") or env.get("BBM_QWEN_API_KEY")
     elif options.provider:
         env_key_name = provider_cfg.get("env_key", "") if provider_cfg else ""
-        API_KEY = options.api_key or (env.get(env_key_name) if env_key_name else "")
+        API_KEY = (
+            options.api_key
+            or (key_loader.get_key(env_key_name) if env_key_name else None)
+            or (key_loader.get_key(options.provider) if options.provider else None)
+            or (env.get(env_key_name) if env_key_name else "")
+        )
         if not API_KEY:
             hint = f" or set {env_key_name}" if env_key_name else ""
             raise Exception(f"Please provide API key via --api_key{hint}")

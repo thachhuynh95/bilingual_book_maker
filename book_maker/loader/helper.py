@@ -26,8 +26,15 @@ class EPUBBookLoaderHelper:
             return
         new_p = copy(p)
         new_p.string = text
-        if translation_style != "":
-            new_p["style"] = translation_style
+        if not single_translate:
+            orig_style = "background-color: rgba(120, 120, 160, 0.15); border-left: 4px solid #7c5cff; padding: 10px 14px; margin-top: 14px; margin-bottom: 6px; border-radius: 0 8px 8px 0; font-style: italic;"
+            existing_orig = p.attrs.get("style", "") if hasattr(p, "attrs") and p.attrs else ""
+            p["style"] = f"{orig_style} {existing_orig}".strip()
+            trans_style = translation_style if translation_style != "" else "padding: 4px 14px 14px 4px; margin-top: 0; margin-bottom: 20px;"
+            new_p["style"] = trans_style
+        else:
+            if translation_style != "":
+                new_p["style"] = translation_style
         p.insert_after(new_p)
         if single_translate:
             p.extract()

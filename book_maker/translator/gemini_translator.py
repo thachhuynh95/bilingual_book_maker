@@ -83,17 +83,37 @@ PROMPT_ENV_MAP = {
 }
 
 GEMINIPRO_MODEL_LIST = [
-    "gemini-pro-latest",
+    "gemini-3.5-pro",
+    "gemini-3.1-pro",
+    "gemini-3-pro",
     "gemini-2.5-pro",
+    "gemini-2.0-pro",
+    "gemini-1.5-pro",
+    "gemini-3.1-pro-preview",
     "gemini-3-pro-preview",
+    "gemini-1.5-pro-latest",
+    "gemini-1.5-pro-001",
+    "gemini-1.5-pro-002",
+    "gemini-pro-latest",
 ]
 
 GEMINIFLASH_MODEL_LIST = [
-    "gemini-flash-latest",
+    "gemini-3.5-flash",
+    "gemini-3.1-flash",
+    "gemini-3-flash",
     "gemini-2.5-flash",
     "gemini-2.0-flash",
+    "gemini-1.5-flash",
     "gemini-2.5-flash-lite",
     "gemini-2.0-flash-001",
+    "gemini-3.1-flash-lite",
+    "gemini-3-flash-preview",
+    "gemini-2.0-flash-exp",
+    "gemini-2.5-flash-preview-04-17",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash-001",
+    "gemini-1.5-flash-002",
+    "gemini-flash-latest",
     "gemini-flash-lite-latest",
 ]
 
@@ -134,6 +154,10 @@ class Gemini(Base):
         **kwargs,
     ) -> None:
         super().__init__(key, language)
+        if isinstance(key, list):
+            self._original_keys_list = [k.strip() for k in key if isinstance(k, str) and k.strip()]
+        else:
+            self._original_keys_list = [k.strip() for k in key.split(",") if k.strip()]
         self.context_flag = context_flag
         self.prompt = (
             prompt_template
@@ -187,10 +211,37 @@ class Gemini(Base):
         )
 
     def rotate_model(self):
+        old_model = getattr(self, 'model', 'None')
         self.model = next(self.model_list)
+        print(f"🔄 [Model Rotated] {old_model} ➔ {self.model}")
         self.create_convo()
 
     def rotate_key(self):
+        # Hot reload keys from config file dynamically on rotation
+        try:
+            from book_maker import key_loader
+            key_loader._keys_cache = None  # Clear key loader cache
+            fresh_keys = key_loader.get_key("gemini_key")
+            if fresh_keys:
+                if isinstance(fresh_keys, list):
+                    new_keys_list = [k.strip() for k in fresh_keys if isinstance(k, str) and k.strip()]
+                else:
+                    new_keys_list = [k.strip() for k in fresh_keys.split(",") if k.strip()]
+                
+                if hasattr(self, "_original_keys_list") and self._original_keys_list != new_keys_list:
+                    print(f"\n[bold blue]Hot reload: Found updated API keys list: {new_keys_list}[/bold blue]")
+                    self._original_keys_list = new_keys_list
+                    self.keys = cycle(new_keys_list)
+                    if hasattr(self, "_raw_model_list") and self._raw_model_list:
+                        self.model_list = cycle(self._raw_model_list)
+                        old_m = getattr(self, 'model', 'None')
+                        self.model = self._raw_model_list[0]
+                        print(f"🔄 [Model Reset to Primary on Hot-Reload] {old_m} ➔ {self.model}")
+                elif not hasattr(self, "_original_keys_list"):
+                    self._original_keys_list = new_keys_list
+        except Exception as e:
+            print(f"Warning during hot reload check: {e}")
+
         self.client = genai.Client(api_key=next(self.keys))
         self.create_convo()
 
@@ -296,10 +347,12 @@ class Gemini(Base):
             key=allowed_models.index,
         )
         if not model_list:
-            raise ValueError(
-                f"None of the expected models {allowed_models} are available "
-                f"for this API key. Available models: {available_models}"
-            )
+            keyword = "pro" if any("pro" in m for m in allowed_models) else "flash"
+            fallback_models = [m for m in available_models if keyword in m and "embedding" not in m and "image" not in m]
+            if fallback_models:
+                model_list = [fallback_models[0]]
+            else:
+                model_list = ["gemini-2.5-flash"]
         print(f"Using model list {model_list}")
         self.model_list = cycle(model_list)
         self.rotate_model()
@@ -308,6 +361,7 @@ class Gemini(Base):
         # keep the order of input
         model_list = sorted(list(set(model_list)), key=model_list.index)
         print(f"Using model list {model_list}")
+        self._raw_model_list = model_list
         self.model_list = cycle(model_list)
         self.rotate_model()
 
@@ -352,6 +406,7 @@ class Gemini(Base):
     ) -> list[str] | None:
         """Internal batch translation with tenacity retry."""
         try:
+            print(f"🤖 [Model: {self.model}] Translating batch of {batch_size} paragraphs...")
             response = self.convo.send_message(
                 prompt,
                 config=types.GenerateContentConfig(
@@ -414,7 +469,15 @@ class Gemini(Base):
                 f"field containing exactly {expected_count} translated texts in order."
             )
 
-        result = self._batch_translate_with_retry(prompt, expected_count)
+        try:
+            result = self._batch_translate_with_retry(prompt, expected_count)
+        except Exception as e:
+            if hasattr(self, 'model_list'):
+                print(f"⚠️ Exhausted quota/key attempts for model {self.model}. Rotating model...")
+                self.rotate_model()
+                result = self._batch_translate_with_retry(prompt, expected_count)
+            else:
+                raise e
 
         # Check again after retry attempt (error may have been detected during retries)
         if self._fatal_error_detected:

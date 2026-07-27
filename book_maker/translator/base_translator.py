@@ -11,7 +11,12 @@ class Base(ABC):
     TRANSLATION_ERROR_MARKER = None
 
     def __init__(self, key, language) -> None:
-        self.keys = itertools.cycle(key.split(","))
+        if isinstance(key, list):
+            self.keys = itertools.cycle([k.strip() for k in key if isinstance(k, str) and k.strip()])
+        elif isinstance(key, str):
+            self.keys = itertools.cycle([k.strip() for k in key.split(",") if k.strip()])
+        else:
+            self.keys = itertools.cycle([])
         self.language = language
         self._fatal_error_detected = False
 
